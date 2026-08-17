@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgriSocial - Farm Network</title>
+  <style>
+    :root { 
+      --primary: #2e7d32; 
+      --primary-hover: #1b5e20;
+      --bg: #f4f6f4; 
+      --card: #ffffff; 
+      --text: #1b1b1b; 
+      --error: #c62828;
+    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+    header { background: var(--primary); color: white; padding: 1rem; text-align: center; }
+    .container { max-width: 600px; margin: 1.5rem auto; padding: 0 1rem; }
+    .card { background: var(--card); padding: 1.2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+    input, textarea, select, button { width: 100%; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+    button { background: var(--primary); color: white; font-weight: bold; border: none; cursor: pointer; margin-top: 1rem; transition: background 0.2s; }
+    button:hover { background: var(--primary-hover); }
+    button:disabled { background: #9e9e9e; cursor: not-allowed; }
+    .post { border-bottom: 1px solid #eee; padding: 1rem 0; }
+    .post:last-child { border-bottom: none; }
+    .post-header { display: flex; justify-content: space-between; font-size: 0.85rem; color: #666; }
+    .badge { background: #e8f5e9; color: var(--primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold; }
+    .post-content { margin-top: 0.5rem; line-height: 1.4; word-wrap: break-word; }
+    
+    /* Error Banner Styling */
+    #error-banner {
+      display: none;
+      background: #ffebee;
+      color: var(--error);
+      border: 1px solid #ef9a9a;
+      padding: 0.8rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🌾 AgriSocial Network</h1>
+  </header>
+
+  <div class="container">
+    <!-- Global Error UI Toast -->
+    <div id="error-banner"></div>
+
+    <div class="card">
+      <h3>Create Field Update</h3>
+      <input type="text" id="author" placeholder="Your Name & Region (e.g., John - Dairy, WI)" maxlength="60">
+      <select id="category">
+        <option value="General">General</option>
+        <option value="Crop Care">Crop Care</option>
+        <option value="Livestock">Livestock</option>
+        <option value="Equipment">Equipment</option>
+        <option value="Market Talk">Market Talk</option>
+      </select>
+      <textarea id="content" rows="3" placeholder="What is happening on your acreage today?" maxlength="500"></textarea>
+      <button id="submit-btn" onclick="submitPost()">Post Update</button>
+    </div>
+
+    <div class="card">
+      <label for="filter"><strong>Filter Feed:</strong></label>
+      <select id="filter" onchange="loadPosts()">
+        <option value="All">All Categories</option>
+        <option value="Crop Care">Crop Care</option>
+        <option value="Livestock">Livestock</option>
+        <option value="Equipment">Equipment</option>
+        <option value="Market Talk">Market Talk</option>
+      </select>
+
+      <div id="feed" style="margin-top: 1rem;">Loading updates...</div>
+    </div>
+  </div>
+
+  <script>
+    // UI Notification Helper
+    function showError(message) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = message;
+      banner.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => { banner.style.display = 'none'; }, 6000);
+    }
+
+    // Secure Network Fetch Utility with Timeout Handling
+    async function secureFetch(url, options = {}) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
+        });
+
+        clearTimeout(timeoutId);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error?.message || `Server error (${response.status})`);
+        }
+
+        return data;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          throw new Error('Network request timed out. Please check signal strength.');
+        }
+        throw err;
+      }
+    }
+
+    // Load Posts Feed
+    async function loadPosts() {
+      const feed = document.getElementById('feed');
+      const category = document.getElementById('filter').value;
+
+      try {
+        const posts = await secureFetch(`/api/posts?category=${encodeURIComponent(category)}`);
+
+        if (!posts.length) {
+          feed.innerHTML = '<p style="color: #666;">No posts found in this category.</p>';
+          return;
+        }
+
+        // Render using safe DOM construction to avoid direct raw injection
+        feed.innerHTML = '';
+        posts.forEach(post => {
+          const postEl = document.createElement('div');
+          postEl.className = 'post';
+
+          const header = document.createElement('div');
+          header.className = 'post-header';
+          
+          const author = document.createElement('strong');
+          author.textContent = post.author;
+
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = post.category;
+
+          header.appendChild(author);
+          header.appendChild(badge);
+
+          const content = document.createElement('div');
+          content.className = 'post-content';
+          content.textContent = post.content;
+
+          const timestamp = document.createElement('div');
+          timestamp.style.cssText = 'font-size: 0.75rem; color: #999; margin-top: 0.5rem;';
+          timestamp.textContent = post.timestamp ? new Date(post.timestamp).toLocaleString() : '';
+
+          postEl.appendChild(header);
+          postEl.appendChild(content);
+          postEl.appendChild(timestamp);
+
+          feed.appendChild(postEl);
+        });
+
+      } catch (err) {
+        showError(err.message);
+        feed.innerHTML = '<p style="color: var(--error);">Unable to load feed updates.</p>';
+      }
+    }
+
+    // Submit New Field Update
+    async function submitPost() {
+      const authorInput = document.getElementById('author');
+      const categoryInput = document.getElementById('category');
+      const contentInput = document.getElementById('content');
+      const submitBtn = document.getElementById('submit-btn');
+
+      const author = authorInput.value.trim();
+      const category = categoryInput.value;
+      const content = contentInput.value.trim();
+
+      if (!author || !content) {
+        showError('Please complete both your name/location and post content.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Publishing...';
+
+      try {
+        await secureFetch('/api/posts', {
+          method: 'POST',
+          body: JSON.stringify({ author, category, content })
+        });
+
+        contentInput.value = '';
+        loadPosts();
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Post Update';
+      }
+    }
+
+    // Initial load
+    loadPosts();
+  </script>
+</body>
+</html>
