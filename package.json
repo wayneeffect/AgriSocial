@@ -1,0 +1,17 @@
+{
+  "name": "agrisocial-mvp",
+  "version": "1.0.0",
+  "description": "Hardened Agriculture Social Network MVP for Render and GitHub",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "sanitize-html": "^2.13.0",
+    "sqlite3": "^5.1.7"
+  }
+}
